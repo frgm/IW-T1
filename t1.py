@@ -1,5 +1,7 @@
 import socket
- 
+import os.path
+import json
+
 def Main():
     host = "127.0.0.1"
     port = 9100
@@ -8,9 +10,9 @@ def Main():
     sk.bind((host,port))     
     sk.listen(1)
     conn, addr = sk.accept()
-    header =  "HTTP/1.1 200 OK"
-    json = '{"path": "/myapp/index_3.html", "protocol": "HTTP/1.1", "method": "GET", "headers": {"Accept": "text/html", "Accept-Language": "es-ES", "Host": "localhost:9100"}}'
-    
+    httpOK = "HTTP/1.1 200 OK\nX-RequestEcho: "
+    httpNF = "HTTP/1.1 404 Not Found"
+
     print ("Connection from: " + str(addr))
     while True:
             data = conn.recv(1024).decode()
@@ -18,14 +20,30 @@ def Main():
                     break
             if "HTTP/1.1" not in data:
                     break
-            print ("from connected  user: " + str(data))
-             
-            #data = str(data).upper()
-            data = header + "TEST"
-            print ("sending: " + str(data))
-            conn.send(data.encode())
+            print ("Conectado:\n" + str(data))
+            datas = data.strip().splitlines()
+            get = datas[0].split(' ')
+            #no existe break
+            headers = {}
+            for d in datas[1:]:
+                d1,d2 = d.split(': ')
+                headers[d1] = d2
+            res = {}
+            res['path'] = get[1]
+            res['protocol'] = get[2]
+            res['method'] = get[0]
+            res['headers'] = headers
+            res = json.dumps(res)
+            try:
+                arc = open(os.path.dirname(os.path.realpath(__file__)) + get[1],'r')
+            except IOError:
+                conn.send(httpNF.encode())
+                conn.close()
+                exit()
+            retorno = httpOK + res + '\n\n' + arc.read()
+            conn.send(retorno.encode())
             conn.close()
-             exit()
+            exit()
      
 if __name__ == '__main__':
     Main()
